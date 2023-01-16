@@ -204,6 +204,7 @@ type CustomPricing struct {
 	NegotiatedDiscount           string `json:"negotiatedDiscount"`
 	SharedOverhead               string `json:"sharedOverhead"`
 	ClusterName                  string `json:"clusterName"`
+	ClusterAccount               string `json:"clusterAccount,omitempty"`
 	SharedNamespaces             string `json:"sharedNamespaces"`
 	SharedLabelNames             string `json:"sharedLabelNames"`
 	SharedLabelValues            string `json:"sharedLabelValues"`
@@ -457,6 +458,11 @@ func NewProvider(cache clustercache.ClusterCache, apiKey string, config *config.
 	}
 
 	cp := getClusterProperties(nodes[0])
+	providerConfig := NewProviderConfig(config, cp.configFileName)
+	// If ClusterAccount is set apply it to the cluster properties
+	if providerConfig.customPricing != nil && providerConfig.customPricing.ClusterAccount != "" {
+		cp.account = providerConfig.customPricing.ClusterAccount
+	}
 
 	switch cp.provider {
 	case kubecost.CSVProvider:
@@ -489,7 +495,7 @@ func NewProvider(cache clustercache.ClusterCache, apiKey string, config *config.
 			Clientset:            cache,
 			Config:               NewProviderConfig(config, cp.configFileName),
 			clusterRegion:        cp.region,
-			clusterAccountId:     cp.accountID,
+			clusterAccountId:     cp.account,
 			serviceAccountChecks: NewServiceAccountChecks(),
 		}, nil
 	case kubecost.AzureProvider:
@@ -498,7 +504,7 @@ func NewProvider(cache clustercache.ClusterCache, apiKey string, config *config.
 			Clientset:            cache,
 			Config:               NewProviderConfig(config, cp.configFileName),
 			clusterRegion:        cp.region,
-			clusterAccountId:     cp.accountID,
+			clusterAccountId:     cp.account,
 			serviceAccountChecks: NewServiceAccountChecks(),
 		}, nil
 	case kubecost.AlibabaProvider:
@@ -507,7 +513,7 @@ func NewProvider(cache clustercache.ClusterCache, apiKey string, config *config.
 			Clientset:            cache,
 			Config:               NewProviderConfig(config, cp.configFileName),
 			clusterRegion:        cp.region,
-			clusterAccountId:     cp.accountID,
+			clusterAccountId:     cp.account,
 			serviceAccountChecks: NewServiceAccountChecks(),
 		}, nil
 	case kubecost.ScalewayProvider:
@@ -530,7 +536,7 @@ type clusterProperties struct {
 	provider       string
 	configFileName string
 	region         string
-	accountID      string
+	account        string
 	projectID      string
 }
 
@@ -541,7 +547,7 @@ func getClusterProperties(node *v1.Node) clusterProperties {
 		provider:       "DEFAULT",
 		configFileName: "default.json",
 		region:         region,
-		accountID:      "",
+		account:        "",
 		projectID:      "",
 	}
 	if metadata.OnGCE() {
@@ -554,7 +560,7 @@ func getClusterProperties(node *v1.Node) clusterProperties {
 	} else if strings.HasPrefix(providerID, "azure") {
 		cp.provider = kubecost.AzureProvider
 		cp.configFileName = "azure.json"
-		cp.accountID = parseAzureSubscriptionID(providerID)
+		cp.account = parseAzureSubscriptionID(providerID)
 	} else if strings.HasPrefix(providerID, "scaleway") { // the scaleway provider ID looks like scaleway://instance/<instance_id>
 		cp.provider = kubecost.ScalewayProvider
 		cp.configFileName = "scaleway.json"
